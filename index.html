@@ -149,23 +149,47 @@
                         </button>
 
                         <!-- 1. Daily Calendar Picker Container -->
-                        <div id="daily-picker-wrapper" class="flex items-center gap-2">
-                            <div class="relative flex items-center">
-                                <input type="date" id="daily-date-input"
-                                    class="bg-slate-50 border border-gray-200 text-slate-800 font-semibold text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer shadow-inner" />
-                            </div>
-                            <span id="daily-day-label" class="text-xs font-bold text-brand-600 bg-brand-50 px-2.5 py-1.5 rounded-lg border border-brand-200/60 whitespace-nowrap">--</span>
+                        <div id="daily-picker-wrapper" class="flex items-center">
+                            <input type="date" id="daily-date-input"
+                                class="bg-slate-50 border border-gray-200 text-slate-800 font-semibold text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer shadow-inner" />
                         </div>
 
-                        <!-- 2. Weekly / Monthly / Yearly Selector Container -->
-                        <div id="select-picker-wrapper" class="relative hidden">
-                            <select id="simple-period-select"
-                                class="appearance-none bg-slate-50 border border-gray-200 text-slate-800 py-1.5 pl-3.5 pr-9 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer shadow-inner min-w-[180px]">
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
+                        <!-- 2. Cascading Period Controls (Year, Month, Week) -->
+                        <div id="cascading-picker-wrapper" class="flex items-center gap-1.5 hidden">
+                            <!-- Year Select -->
+                            <div class="relative" id="year-select-wrapper">
+                                <select id="year-select"
+                                    class="appearance-none bg-slate-50 border border-gray-200 text-slate-800 py-1.5 pl-3 pr-8 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer shadow-inner min-w-[85px]">
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- Month Select -->
+                            <div class="relative" id="month-select-wrapper">
+                                <select id="month-select"
+                                    class="appearance-none bg-slate-50 border border-gray-200 text-slate-800 py-1.5 pl-3 pr-8 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer shadow-inner min-w-[85px]">
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- Week Select -->
+                            <div class="relative" id="week-select-wrapper">
+                                <select id="week-select"
+                                    class="appearance-none bg-slate-50 border border-gray-200 text-slate-800 py-1.5 pl-3 pr-8 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer shadow-inner min-w-[95px]">
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
                             </div>
                         </div>
 

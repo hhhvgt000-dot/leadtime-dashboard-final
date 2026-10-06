@@ -174,18 +174,9 @@ function getParsedPeriodList(type) {
         
         return validFiles.map(filename => {
             const datePart = filename.split(' ')[0]; // "2026-10-04"
-            const match = filename.match(/\((\d+년)\s*(\d+월)\s*(.*?)_?(월|화|수|목|금|토|일)?\)/);
-            
-            let dayOfWeek = match && match[4] ? match[4] : '';
-            let weekTag = match && match[3] ? match[3] : '';
-            
-            const dayTag = dayOfWeek ? `${dayOfWeek}요일${weekTag ? ` (${weekTag})` : ''}` : weekTag;
-            
             return {
                 selection: datePart,
                 dateStr: datePart,
-                dayTag: dayTag || '데일리',
-                label: `${datePart}${dayOfWeek ? ` (${dayOfWeek})` : ''}`,
                 filename: filename
             };
         }).reverse(); // Most recent first
@@ -194,10 +185,18 @@ function getParsedPeriodList(type) {
         const validFiles = weeklyFiles.filter(f => !f.includes('25년'));
         
         return validFiles.map(filename => {
-            const selection = filename.replace('.json', '');
+            const selection = filename.replace('.json', ''); // "26년 10월 1주차"
+            const match = selection.match(/^(\d+년)\s*(\d+월)\s*(.+)$/);
+            
+            const year = match ? match[1] : '26년';
+            const month = match ? match[2] : '10월';
+            const week = match ? match[3] : selection;
+            
             return {
                 selection: selection,
-                label: selection,
+                year: year,
+                month: month,
+                week: week,
                 filename: filename
             };
         }).reverse();
@@ -206,10 +205,17 @@ function getParsedPeriodList(type) {
         const validFiles = monthlyFiles.filter(f => !f.includes('25년'));
         
         return validFiles.map(filename => {
-            const selection = filename.replace('.json', '');
+            const selection = filename.replace('.json', ''); // "26년 10월"
+            const match = selection.match(/^(\d+년)\s*(\d+월)$/);
+            
+            const year = match ? match[1] : '26년';
+            const month = match ? match[2] : selection;
+            
             return {
                 selection: selection,
-                label: selection,
+                year: year,
+                month: month,
+                week: '',
                 filename: filename
             };
         }).reverse();
@@ -221,7 +227,9 @@ function getParsedPeriodList(type) {
             const selection = filename.replace('.json', '');
             return {
                 selection: selection,
-                label: selection,
+                year: selection,
+                month: '',
+                week: '',
                 filename: filename
             };
         }).reverse();
@@ -235,38 +243,92 @@ function updateDropdown(type) {
     currentParsedList = getParsedPeriodList(type);
     
     const dailyWrapper = document.getElementById('daily-picker-wrapper');
-    const selectWrapper = document.getElementById('select-picker-wrapper');
-    const simpleSelect = document.getElementById('simple-period-select');
+    const cascadingWrapper = document.getElementById('cascading-picker-wrapper');
+    const yearWrapper = document.getElementById('year-select-wrapper');
+    const monthWrapper = document.getElementById('month-select-wrapper');
+    const weekWrapper = document.getElementById('week-select-wrapper');
     const dailyInput = document.getElementById('daily-date-input');
     
     if (type === 'daily') {
         if (dailyWrapper) dailyWrapper.classList.remove('hidden');
-        if (selectWrapper) selectWrapper.classList.add('hidden');
+        if (cascadingWrapper) cascadingWrapper.classList.add('hidden');
         
         if (dailyInput && currentParsedList.length > 0) {
-            // Set min and max dates on input[type="date"]
             const dates = currentParsedList.map(i => i.dateStr).sort();
             dailyInput.min = dates[0];
             dailyInput.max = dates[dates.length - 1];
         }
     } else {
         if (dailyWrapper) dailyWrapper.classList.add('hidden');
-        if (selectWrapper) selectWrapper.classList.remove('hidden');
+        if (cascadingWrapper) cascadingWrapper.classList.remove('hidden');
         
-        if (simpleSelect) {
-            simpleSelect.innerHTML = '';
-            currentParsedList.forEach(item => {
-                const opt = document.createElement('option');
-                opt.value = item.selection;
-                opt.textContent = item.label;
-                simpleSelect.appendChild(opt);
-            });
+        if (type === 'yearly') {
+            if (yearWrapper) yearWrapper.classList.remove('hidden');
+            if (monthWrapper) monthWrapper.classList.add('hidden');
+            if (weekWrapper) weekWrapper.classList.add('hidden');
+        } else if (type === 'monthly') {
+            if (yearWrapper) yearWrapper.classList.remove('hidden');
+            if (monthWrapper) monthWrapper.classList.remove('hidden');
+            if (weekWrapper) weekWrapper.classList.add('hidden');
+        } else if (type === 'weekly') {
+            if (yearWrapper) yearWrapper.classList.remove('hidden');
+            if (monthWrapper) monthWrapper.classList.remove('hidden');
+            if (weekWrapper) weekWrapper.classList.remove('hidden');
         }
+        
+        populateYearSelect();
     }
     
     if (currentParsedList.length > 0) {
         selectPeriodByIndex(0, false);
     }
+}
+
+function populateYearSelect() {
+    const yearSelect = document.getElementById('year-select');
+    if (!yearSelect) return;
+    
+    const years = [...new Set(currentParsedList.map(item => item.year))];
+    yearSelect.innerHTML = '';
+    
+    years.forEach(y => {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        yearSelect.appendChild(opt);
+    });
+}
+
+function populateMonthSelect(selectedYear) {
+    const monthSelect = document.getElementById('month-select');
+    if (!monthSelect) return;
+    
+    const filtered = currentParsedList.filter(item => item.year === selectedYear);
+    const months = [...new Set(filtered.map(item => item.month))];
+    
+    monthSelect.innerHTML = '';
+    months.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        monthSelect.appendChild(opt);
+    });
+}
+
+function populateWeekSelect(selectedYear, selectedMonth) {
+    const weekSelect = document.getElementById('week-select');
+    if (!weekSelect) return;
+    
+    const filtered = currentParsedList.filter(item => item.year === selectedYear && item.month === selectedMonth);
+    const weeks = [...new Set(filtered.map(item => item.week))];
+    
+    weekSelect.innerHTML = '';
+    weeks.forEach(w => {
+        const opt = document.createElement('option');
+        opt.value = w;
+        opt.textContent = w;
+        weekSelect.appendChild(opt);
+    });
 }
 
 function selectPeriodByIndex(idx, triggerLoad = true) {
@@ -276,20 +338,30 @@ function selectPeriodByIndex(idx, triggerLoad = true) {
     const targetItem = currentParsedList[idx];
     
     const dailyInput = document.getElementById('daily-date-input');
-    const dailyLabel = document.getElementById('daily-day-label');
-    const simpleSelect = document.getElementById('simple-period-select');
+    const yearSelect = document.getElementById('year-select');
+    const monthSelect = document.getElementById('month-select');
+    const weekSelect = document.getElementById('week-select');
     const hiddenDropdown = document.getElementById('period-dropdown');
     
     if (currentViewType === 'daily') {
         if (dailyInput && targetItem.dateStr) {
             dailyInput.value = targetItem.dateStr;
         }
-        if (dailyLabel && targetItem.dayTag) {
-            dailyLabel.textContent = targetItem.dayTag;
-        }
     } else {
-        if (simpleSelect) {
-            simpleSelect.value = targetItem.selection;
+        if (yearSelect && targetItem.year) {
+            yearSelect.value = targetItem.year;
+        }
+        if (targetItem.year) {
+            populateMonthSelect(targetItem.year);
+        }
+        if (monthSelect && targetItem.month) {
+            monthSelect.value = targetItem.month;
+        }
+        if (targetItem.year && targetItem.month) {
+            populateWeekSelect(targetItem.year, targetItem.month);
+        }
+        if (weekSelect && targetItem.week) {
+            weekSelect.value = targetItem.week;
         }
     }
     
@@ -316,17 +388,79 @@ function updateStepperButtonsState() {
     }
 }
 
+function onYearChange() {
+    const yearSelect = document.getElementById('year-select');
+    const selectedYear = yearSelect.value;
+    
+    if (currentViewType === 'yearly') {
+        const item = currentParsedList.find(i => i.year === selectedYear);
+        if (item) {
+            const idx = currentParsedList.indexOf(item);
+            selectPeriodByIndex(idx, true);
+        }
+        return;
+    }
+    
+    populateMonthSelect(selectedYear);
+    onMonthChange();
+}
+
+function onMonthChange() {
+    const yearSelect = document.getElementById('year-select');
+    const monthSelect = document.getElementById('month-select');
+    const selectedYear = yearSelect.value;
+    const selectedMonth = monthSelect.value;
+    
+    if (currentViewType === 'monthly') {
+        const item = currentParsedList.find(i => i.year === selectedYear && i.month === selectedMonth);
+        if (item) {
+            const idx = currentParsedList.indexOf(item);
+            selectPeriodByIndex(idx, true);
+        }
+        return;
+    }
+    
+    populateWeekSelect(selectedYear, selectedMonth);
+    onWeekChange();
+}
+
+function onWeekChange() {
+    const yearSelect = document.getElementById('year-select');
+    const monthSelect = document.getElementById('month-select');
+    const weekSelect = document.getElementById('week-select');
+    
+    const selectedYear = yearSelect.value;
+    const selectedMonth = monthSelect.value;
+    const selectedWeek = weekSelect.value;
+    
+    const item = currentParsedList.find(i => 
+        i.year === selectedYear && 
+        i.month === selectedMonth && 
+        i.week === selectedWeek
+    );
+    
+    if (item) {
+        const idx = currentParsedList.indexOf(item);
+        currentSelectedIndex = idx;
+        const hiddenDropdown = document.getElementById('period-dropdown');
+        if (hiddenDropdown) {
+            hiddenDropdown.innerHTML = `<option value="${item.selection}">${item.selection}</option>`;
+            hiddenDropdown.value = item.selection;
+        }
+        updateStepperButtonsState();
+        loadData();
+    }
+}
+
 function onDailyDateChange(e) {
     const chosenDate = e.target.value;
     if (!chosenDate) return;
     
-    // Find exact match
     let matchIdx = currentParsedList.findIndex(i => i.dateStr === chosenDate);
     
     if (matchIdx !== -1) {
         selectPeriodByIndex(matchIdx, true);
     } else {
-        // Find closest date if chosen date doesn't have an exact file
         let closestIdx = 0;
         let minDiff = Infinity;
         const targetTime = new Date(chosenDate).getTime();
@@ -343,20 +477,18 @@ function onDailyDateChange(e) {
     }
 }
 
-function onSimpleSelectChange(e) {
-    const selectedVal = e.target.value;
-    const matchIdx = currentParsedList.findIndex(i => i.selection === selectedVal);
-    if (matchIdx !== -1) {
-        selectPeriodByIndex(matchIdx, true);
-    }
-}
-
 function initPeriodControlListeners() {
     const dailyInput = document.getElementById('daily-date-input');
     if (dailyInput) dailyInput.addEventListener('change', onDailyDateChange);
     
-    const simpleSelect = document.getElementById('simple-period-select');
-    if (simpleSelect) simpleSelect.addEventListener('change', onSimpleSelectChange);
+    const yearSelect = document.getElementById('year-select');
+    if (yearSelect) yearSelect.addEventListener('change', onYearChange);
+    
+    const monthSelect = document.getElementById('month-select');
+    if (monthSelect) monthSelect.addEventListener('change', onMonthChange);
+    
+    const weekSelect = document.getElementById('week-select');
+    if (weekSelect) weekSelect.addEventListener('change', onWeekChange);
     
     const prevBtn = document.getElementById('prev-period-btn');
     if (prevBtn) {
