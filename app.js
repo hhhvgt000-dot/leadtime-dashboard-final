@@ -165,26 +165,34 @@ function initViewToggles() {
     });
 }
 
+function extractNumber(str) {
+    if (!str) return 0;
+    const match = str.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 0;
+}
+
 function getParsedPeriodList(type) {
     if (!fileListConfig) return [];
     
+    let list = [];
     if (type === 'daily') {
         const dailyFiles = fileListConfig['데일리'] || [];
         const validFiles = dailyFiles.filter(f => !f.includes('25년') && !f.startsWith('2025'));
         
-        return validFiles.map(filename => {
+        list = validFiles.map(filename => {
             const datePart = filename.split(' ')[0]; // "2026-10-04"
             return {
                 selection: datePart,
                 dateStr: datePart,
                 filename: filename
             };
-        }).reverse(); // Most recent first
+        });
+        list.sort((a, b) => b.dateStr.localeCompare(a.dateStr));
     } else if (type === 'weekly') {
         const weeklyFiles = fileListConfig['주간'] || [];
         const validFiles = weeklyFiles.filter(f => !f.includes('25년'));
         
-        return validFiles.map(filename => {
+        list = validFiles.map(filename => {
             const selection = filename.replace('.json', ''); // "26년 10월 1주차"
             const match = selection.match(/^(\d+년)\s*(\d+월)\s*(.+)$/);
             
@@ -199,12 +207,19 @@ function getParsedPeriodList(type) {
                 week: week,
                 filename: filename
             };
-        }).reverse();
+        });
+        list.sort((a, b) => {
+            const yearDiff = extractNumber(b.year) - extractNumber(a.year);
+            if (yearDiff !== 0) return yearDiff;
+            const monthDiff = extractNumber(b.month) - extractNumber(a.month);
+            if (monthDiff !== 0) return monthDiff;
+            return extractNumber(b.week) - extractNumber(a.week);
+        });
     } else if (type === 'monthly') {
         const monthlyFiles = fileListConfig['월간'] || [];
         const validFiles = monthlyFiles.filter(f => !f.includes('25년'));
         
-        return validFiles.map(filename => {
+        list = validFiles.map(filename => {
             const selection = filename.replace('.json', ''); // "26년 10월"
             const match = selection.match(/^(\d+년)\s*(\d+월)$/);
             
@@ -218,12 +233,17 @@ function getParsedPeriodList(type) {
                 week: '',
                 filename: filename
             };
-        }).reverse();
+        });
+        list.sort((a, b) => {
+            const yearDiff = extractNumber(b.year) - extractNumber(a.year);
+            if (yearDiff !== 0) return yearDiff;
+            return extractNumber(b.month) - extractNumber(a.month);
+        });
     } else if (type === 'yearly') {
         const yearlyFiles = fileListConfig['연간'] || [];
         const validFiles = yearlyFiles.filter(f => !f.includes('25년'));
         
-        return validFiles.map(filename => {
+        list = validFiles.map(filename => {
             const selection = filename.replace('.json', '');
             return {
                 selection: selection,
@@ -232,9 +252,10 @@ function getParsedPeriodList(type) {
                 week: '',
                 filename: filename
             };
-        }).reverse();
+        });
+        list.sort((a, b) => extractNumber(b.year) - extractNumber(a.year));
     }
-    return [];
+    return list;
 }
 
 function updateDropdown(type) {
@@ -288,9 +309,10 @@ function populateYearSelect() {
     const yearSelect = document.getElementById('year-select');
     if (!yearSelect) return;
     
-    const years = [...new Set(currentParsedList.map(item => item.year))];
-    yearSelect.innerHTML = '';
+    let years = [...new Set(currentParsedList.map(item => item.year))];
+    years.sort((a, b) => extractNumber(b) - extractNumber(a));
     
+    yearSelect.innerHTML = '';
     years.forEach(y => {
         const opt = document.createElement('option');
         opt.value = y;
@@ -304,7 +326,8 @@ function populateMonthSelect(selectedYear) {
     if (!monthSelect) return;
     
     const filtered = currentParsedList.filter(item => item.year === selectedYear);
-    const months = [...new Set(filtered.map(item => item.month))];
+    let months = [...new Set(filtered.map(item => item.month))];
+    months.sort((a, b) => extractNumber(b) - extractNumber(a));
     
     monthSelect.innerHTML = '';
     months.forEach(m => {
@@ -320,7 +343,8 @@ function populateWeekSelect(selectedYear, selectedMonth) {
     if (!weekSelect) return;
     
     const filtered = currentParsedList.filter(item => item.year === selectedYear && item.month === selectedMonth);
-    const weeks = [...new Set(filtered.map(item => item.week))];
+    let weeks = [...new Set(filtered.map(item => item.week))];
+    weeks.sort((a, b) => extractNumber(b) - extractNumber(a));
     
     weekSelect.innerHTML = '';
     weeks.forEach(w => {
