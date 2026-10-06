@@ -107,6 +107,9 @@ function filterProdTable() {
     renderTable('prod-table-body', filtered, true, true);
 }
 
+let currentParsedList = [];
+let currentSelectedIndex = 0;
+
 document.addEventListener('DOMContentLoaded', async () => {
     // 비밀번호 게이트 초기화 (가장 먼저 실행)
     initLogin();
@@ -119,6 +122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("데이터 구성을 불러오는 데 실패했습니다.", e);
     }
 
+    initCascadingEventListeners();
     initViewToggles();
     if (fileListConfig) {
         updateDropdown('daily'); // default
@@ -156,51 +160,317 @@ function initViewToggles() {
 
             currentViewType = target.dataset.type;
             updateDropdown(currentViewType);
+            loadData();
         });
     });
 }
 
-function updateDropdown(type) {
-    if (!fileListConfig) return;
-    const dropdown = document.getElementById('period-dropdown');
-    dropdown.innerHTML = '';
-
-    let options = [];
+function getParsedPeriodList(type) {
+    if (!fileListConfig) return [];
+    
     if (type === 'daily') {
         const dailyFiles = fileListConfig['데일리'] || [];
-        options = dailyFiles
-            .filter(f => !f.includes('25년') && !f.startsWith('2025'))
-            .map(f => f.split(' ')[0])
-            .reverse(); 
+        const validFiles = dailyFiles.filter(f => !f.includes('25년') && !f.startsWith('2025'));
+        
+        return validFiles.map(filename => {
+            const datePart = filename.split(' ')[0]; // "2026-10-04"
+            const match = filename.match(/\((\d+년)\s*(\d+월)\s*(.*?)_?(월|화|수|목|금|토|일)?\)/);
+            
+            const parts = datePart.split('-');
+            const yearStr = (parts[0] ? parts[0].slice(-2) : '26') + '년';
+            const monthStr = (parts[1] ? parseInt(parts[1], 10) : 10) + '월';
+            const dayNum = parts[2] || '';
+            
+            let dayOfWeek = match && match[4] ? match[4] : '';
+            
+            const year = match ? match[1] : yearStr;
+            const month = match ? match[2] : monthStr;
+            const dayLabel = `${month} ${dayNum}일${dayOfWeek ? ` (${dayOfWeek})` : ''}`;
+            
+            return {
+                selection: datePart,
+                year: year,
+                month: month,
+                detail: dayLabel,
+                filename: filename
+            };
+        }).reverse();
     } else if (type === 'weekly') {
         const weeklyFiles = fileListConfig['주간'] || [];
-        options = weeklyFiles
-            .filter(f => !f.includes('25년'))
-            .map(f => f.replace('.json', ''))
-            .reverse();
+        const validFiles = weeklyFiles.filter(f => !f.includes('25년'));
+        
+        return validFiles.map(filename => {
+            const selection = filename.replace('.json', ''); // "26년 10월 1주차"
+            const match = selection.match(/^(\d+년)\s*(\d+월)\s*(.+)$/);
+            
+            const year = match ? match[1] : '26년';
+            const month = match ? match[2] : '10월';
+            const week = match ? match[3] : selection;
+            
+            return {
+                selection: selection,
+                year: year,
+                month: month,
+                detail: week,
+                filename: filename
+            };
+        }).reverse();
     } else if (type === 'monthly') {
         const monthlyFiles = fileListConfig['월간'] || [];
-        options = monthlyFiles
-            .filter(f => !f.includes('25년'))
-            .map(f => f.replace('.json', ''))
-            .reverse();
+        const validFiles = monthlyFiles.filter(f => !f.includes('25년'));
+        
+        return validFiles.map(filename => {
+            const selection = filename.replace('.json', ''); // "26년 10월"
+            const match = selection.match(/^(\d+년)\s*(\d+월)$/);
+            
+            const year = match ? match[1] : '26년';
+            const month = match ? match[2] : selection;
+            
+            return {
+                selection: selection,
+                year: year,
+                month: month,
+                detail: '',
+                filename: filename
+            };
+        }).reverse();
     } else if (type === 'yearly') {
         const yearlyFiles = fileListConfig['연간'] || [];
-        options = yearlyFiles
-            .filter(f => !f.includes('25년'))
-            .map(f => f.replace('.json', ''))
-            .reverse();
+        const validFiles = yearlyFiles.filter(f => !f.includes('25년'));
+        
+        return validFiles.map(filename => {
+            const selection = filename.replace('.json', '');
+            return {
+                selection: selection,
+                year: selection,
+                month: '',
+                detail: '',
+                filename: filename
+            };
+        }).reverse();
+    }
+    return [];
+}
+
+function updateDropdown(type) {
+    if (!fileListConfig) return;
+    
+    currentParsedList = getParsedPeriodList(type);
+    
+    const monthWrapper = document.getElementById('month-select-wrapper');
+    const detailWrapper = document.getElementById('detail-select-wrapper');
+    const sep1 = document.getElementById('separator-1');
+    const sep2 = document.getElementById('separator-2');
+    
+    if (type === 'yearly') {
+        if (monthWrapper) monthWrapper.classList.add('hidden');
+        if (detailWrapper) detailWrapper.classList.add('hidden');
+        if (sep1) sep1.classList.add('hidden');
+        if (sep2) sep2.classList.add('hidden');
+    } else if (type === 'monthly') {
+        if (monthWrapper) monthWrapper.classList.remove('hidden');
+        if (detailWrapper) detailWrapper.classList.add('hidden');
+        if (sep1) sep1.classList.remove('hidden');
+        if (sep2) sep2.classList.add('hidden');
+    } else {
+        if (monthWrapper) monthWrapper.classList.remove('hidden');
+        if (detailWrapper) detailWrapper.classList.remove('hidden');
+        if (sep1) sep1.classList.remove('hidden');
+        if (sep2) sep2.classList.remove('hidden');
     }
 
-    // remove duplicates
-    options = [...new Set(options)];
+    populateYearSelect();
+    
+    if (currentParsedList.length > 0) {
+        selectPeriodByIndex(0, false);
+    }
+}
 
-    options.forEach(opt => {
-        const option = document.createElement('option');
-        option.value = opt;
-        option.textContent = opt;
-        dropdown.appendChild(option);
+function populateYearSelect() {
+    const yearSelect = document.getElementById('year-select');
+    if (!yearSelect) return;
+    
+    const years = [...new Set(currentParsedList.map(item => item.year))];
+    yearSelect.innerHTML = '';
+    
+    years.forEach(y => {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        yearSelect.appendChild(opt);
     });
+}
+
+function populateMonthSelect(selectedYear) {
+    const monthSelect = document.getElementById('month-select');
+    if (!monthSelect) return;
+    
+    const filtered = currentParsedList.filter(item => item.year === selectedYear);
+    const months = [...new Set(filtered.map(item => item.month))];
+    
+    monthSelect.innerHTML = '';
+    months.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        monthSelect.appendChild(opt);
+    });
+}
+
+function populateDetailSelect(selectedYear, selectedMonth) {
+    const detailSelect = document.getElementById('detail-select');
+    if (!detailSelect) return;
+    
+    const filtered = currentParsedList.filter(item => item.year === selectedYear && item.month === selectedMonth);
+    
+    detailSelect.innerHTML = '';
+    filtered.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.detail || item.selection;
+        opt.textContent = item.detail || item.selection;
+        detailSelect.appendChild(opt);
+    });
+}
+
+function selectPeriodByIndex(idx, triggerLoad = true) {
+    if (idx < 0 || idx >= currentParsedList.length) return;
+    
+    currentSelectedIndex = idx;
+    const targetItem = currentParsedList[idx];
+    
+    const yearSelect = document.getElementById('year-select');
+    const monthSelect = document.getElementById('month-select');
+    const detailSelect = document.getElementById('detail-select');
+    const hiddenDropdown = document.getElementById('period-dropdown');
+    
+    if (yearSelect) {
+        yearSelect.value = targetItem.year;
+    }
+    
+    populateMonthSelect(targetItem.year);
+    if (monthSelect && targetItem.month) {
+        monthSelect.value = targetItem.month;
+    }
+    
+    populateDetailSelect(targetItem.year, targetItem.month);
+    if (detailSelect && targetItem.detail) {
+        detailSelect.value = targetItem.detail;
+    }
+    
+    if (hiddenDropdown) {
+        hiddenDropdown.innerHTML = `<option value="${targetItem.selection}">${targetItem.selection}</option>`;
+        hiddenDropdown.value = targetItem.selection;
+    }
+    
+    updateStepperButtonsState();
+    if (triggerLoad) {
+        loadData();
+    }
+}
+
+function updateStepperButtonsState() {
+    const prevBtn = document.getElementById('prev-period-btn');
+    const nextBtn = document.getElementById('next-period-btn');
+    
+    if (prevBtn) {
+        prevBtn.disabled = currentSelectedIndex >= currentParsedList.length - 1;
+    }
+    if (nextBtn) {
+        nextBtn.disabled = currentSelectedIndex <= 0;
+    }
+}
+
+function onYearChange() {
+    const yearSelect = document.getElementById('year-select');
+    const selectedYear = yearSelect.value;
+    
+    if (currentViewType === 'yearly') {
+        const item = currentParsedList.find(i => i.year === selectedYear);
+        if (item) {
+            const idx = currentParsedList.indexOf(item);
+            selectPeriodByIndex(idx, true);
+        }
+        return;
+    }
+    
+    populateMonthSelect(selectedYear);
+    onMonthChange();
+}
+
+function onMonthChange() {
+    const yearSelect = document.getElementById('year-select');
+    const monthSelect = document.getElementById('month-select');
+    const selectedYear = yearSelect.value;
+    const selectedMonth = monthSelect.value;
+    
+    if (currentViewType === 'monthly') {
+        const item = currentParsedList.find(i => i.year === selectedYear && i.month === selectedMonth);
+        if (item) {
+            const idx = currentParsedList.indexOf(item);
+            selectPeriodByIndex(idx, true);
+        }
+        return;
+    }
+    
+    populateDetailSelect(selectedYear, selectedMonth);
+    onDetailChange();
+}
+
+function onDetailChange() {
+    const yearSelect = document.getElementById('year-select');
+    const monthSelect = document.getElementById('month-select');
+    const detailSelect = document.getElementById('detail-select');
+    
+    const selectedYear = yearSelect.value;
+    const selectedMonth = monthSelect.value;
+    const selectedDetail = detailSelect.value;
+    
+    const item = currentParsedList.find(i => 
+        i.year === selectedYear && 
+        i.month === selectedMonth && 
+        (i.detail === selectedDetail || i.selection === selectedDetail)
+    );
+    
+    if (item) {
+        const idx = currentParsedList.indexOf(item);
+        currentSelectedIndex = idx;
+        const hiddenDropdown = document.getElementById('period-dropdown');
+        if (hiddenDropdown) {
+            hiddenDropdown.innerHTML = `<option value="${item.selection}">${item.selection}</option>`;
+            hiddenDropdown.value = item.selection;
+        }
+        updateStepperButtonsState();
+        loadData();
+    }
+}
+
+function initCascadingEventListeners() {
+    const yearSelect = document.getElementById('year-select');
+    if (yearSelect) yearSelect.addEventListener('change', onYearChange);
+    
+    const monthSelect = document.getElementById('month-select');
+    if (monthSelect) monthSelect.addEventListener('change', onMonthChange);
+    
+    const detailSelect = document.getElementById('detail-select');
+    if (detailSelect) detailSelect.addEventListener('change', onDetailChange);
+    
+    const prevBtn = document.getElementById('prev-period-btn');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (currentSelectedIndex < currentParsedList.length - 1) {
+                selectPeriodByIndex(currentSelectedIndex + 1, true);
+            }
+        });
+    }
+    
+    const nextBtn = document.getElementById('next-period-btn');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            if (currentSelectedIndex > 0) {
+                selectPeriodByIndex(currentSelectedIndex - 1, true);
+            }
+        });
+    }
 }
 
 function getFilenames(type, selection) {
